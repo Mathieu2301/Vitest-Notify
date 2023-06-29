@@ -1,0 +1,29 @@
+name: Run tests
+on:
+  push:
+    branches: ['main']
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+jobs:
+  Run:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
+    - name: Run
+      env:
+        VITEST_NAMESPACE: ${{ secrets.VITEST_NAMESPACE }}
+
+        TELEGRAM_KEY: ${{ secrets.TELEGRAM_KEY }}
+        TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
+
+        SURGE_EMAIL: ${{ secrets.SURGE_EMAIL }}
+        SURGE_PASSWORD: ${{ secrets.SURGE_PASSWORD }}
+        SURGE_URL: ${{ secrets.SURGE_URL }}
+
+        NOTION_KEY: ${{ secrets.NOTION_KEY }}
+        NOTION_TESTS_DB: ${{ secrets.NOTION_TESTS_DB }}
+        NOTION_ISSUES_DB: ${{ secrets.NOTION_ISSUES_DB }}
+      run: yarn test

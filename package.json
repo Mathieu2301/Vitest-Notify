@@ -1,0 +1,27 @@
+{
+  "name": "vitest-notify",
+  "version": "0.0.1",
+  "description": "Use GitHub, Notion and Telegram to run your automated tests, manage incidents, and alert your team(s).",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsc -w",
+    "build": "rm -rf dist/ && tsc",
+    "test": "vitest"
+  },
+  "repository": "https://github.com/Mathieu2301/Vitest-Notify",
+  "author": "Mathieu Colmon <mathieu@colmon.fr>",
+  "license": "MIT",
+  "dependencies": {
+    "@notionhq/client": "^2.2.6",
+    "dotenv": "^16.3.1",
+    "surge-fstream-ignore": "^1.0.6",
+    "tarr": "^1.1.0",
+    "vitest": "^0.32.2"
+  },
+  "devDependencies": {
+    "@vitest/ui": "^0.32.2",
+    "nodemon": "^2.0.22",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6"
+  }
+}

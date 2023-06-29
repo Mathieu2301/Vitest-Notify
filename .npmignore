@@ -1,0 +1,7 @@
+.github/
+html/
+src/
+tests/
+
+*.log
+.env
