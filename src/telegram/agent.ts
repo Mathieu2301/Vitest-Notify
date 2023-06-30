@@ -29,8 +29,6 @@ export async function sendTelegramReport(
   const report = (stacks
     .filter((stack) => changes && changes[stack.id])
     .map((stack) => [
-      `======= *${config.namespace}* =======`,
-      '',
       `*[FAIL]* ${stack.path.map((p) => `\`${p}\``).join('\n  > ')}`,
       '',
       `*${stack.error.name}*: \`${stack.error.message}\``,
@@ -63,14 +61,14 @@ export async function sendTelegramReport(
     if (stacks.find((stack) => stack.id === change.id)) continue;
 
     report.push(
-      `======= *${config.namespace}* =======`,
-      '',
       `*[${change.status}]* ${change.path.map((p) => `\`${p}\``).join('\n  > ')}`,
       '',
     );
   }
 
   if (report.length === 0) return;
+
+  report.unshift(`======= *${config.namespace}* =======`, '');
 
   const url = new URL(`https://api.telegram.org/bot${config.key}/sendMessage`);
   url.searchParams.set('chat_id', config.chat as string);
