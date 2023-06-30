@@ -84,19 +84,43 @@ const client = new Client({
   auth: config.notionKey,
 });
 
+type IconName = (
+  | 'question-mark'
+  | 'checkmark'
+  | 'clear'
+  | 'code'
+  | 'playback-pause'
+  | 'playback-play'
+  | 'checklist'
+  | 'list'
+  | 'layers'
+);
+
+type IconColor = (
+  | 'green'
+  | 'blue'
+  | 'yellow'
+  | 'red'
+  | 'pink'
+  | 'gray'
+);
+
+type Icon = `${IconName}_${IconColor}`;
+type IconUrl = `https://www.notion.so/icons/${Icon}.svg`;
+
+const getIconUrl = (icon: Icon): IconUrl => `https://www.notion.so/icons/${icon}.svg`;
+
 type TestStatus = 'PASS' | 'FAIL' | 'SKIP' | 'TODO' | 'ONLY' | 'RUN' | 'UNKNOWN';
 
-const defaultIcon = 'question-mark_yellow';
-const icons: { [status in TestStatus]: string } = {
-  PASS: 'checkmark_green',
-  FAIL: 'clear_red',
-  SKIP: 'playback-pause_blue',
-  TODO: 'code_pink',
-  ONLY: 'checkmark_blue',
-  RUN: 'playback-play_gray',
-  UNKNOWN: defaultIcon,
+const statusIconsUrls: { [status in TestStatus]: IconUrl } = {
+  PASS: getIconUrl('checkmark_green'),
+  FAIL: getIconUrl('clear_red'),
+  SKIP: getIconUrl('playback-pause_blue'),
+  TODO: getIconUrl('code_pink'),
+  ONLY: getIconUrl('checkmark_blue'),
+  RUN: getIconUrl('playback-play_gray'),
+  UNKNOWN: getIconUrl('question-mark_yellow'),
 } as const;
-
 
 interface Test {
   /** Task ID */
@@ -315,9 +339,7 @@ export async function updateNotionTestsDB(files?: File[]) {
       },
       icon: {
         type: 'external',
-        external: {
-          url: `https://www.notion.so/icons/${icons[test.status] || defaultIcon}.svg`,
-        },
+        external: { url: statusIconsUrls[test.status] ?? statusIconsUrls.UNKNOWN },
       },
     };
 
@@ -444,9 +466,9 @@ export async function updateNotionIssuesDB(stacks: Stack[], changes: Changes, re
     const stackName = `${stack.error.name}: ${stack.error.message}`;
 
     console.log(
-      'Creating page for stack:\n',
-      `=> ${stackName}\n`,
-      ` for page: ${changes[stack.id].pageUrl}`,
+      'Creating issue page\n',
+      ` for stack: '${stackName}'\n`,
+      ` for test page: ${changes[stack.id].pageUrl}`,
     );
 
     const newPage = await client.pages.create({
@@ -526,6 +548,8 @@ export async function updateNotionIssuesDB(stacks: Stack[], changes: Changes, re
       ],
     });
 
+    console.log(` => ${(newPage as { url: string }).url}`);
+
     pagesUrls[stack.id] = {
       id: newPage.id,
       url: (newPage as { url: string }).url,
@@ -558,7 +582,7 @@ export async function updateNotionDatabases() {
     const failCount = statuses.filter((status) => status === 'FAIL').length;
     const totalCount = passCount + failCount;
 
-    const pageIcon = (failCount === 0) ? 'checklist_green' : 'list_red';
+    const pageIcon: Icon = (failCount === 0) ? 'checklist_green' : 'list_red';
     const newTitle = `${i8n.texts.automaticTests}: ${passCount}/${totalCount}`;
 
     console.log(
@@ -575,11 +599,11 @@ export async function updateNotionDatabases() {
       }],
       icon: {
         type: 'external',
-        external: { url: `https://www.notion.so/icons/${pageIcon}.svg` },
+        external: { url: getIconUrl(pageIcon) },
       },
     });
 
-    const issuePageIcon = (failCount === 0) ? 'layers_green' : 'layers_red';
+    const issuePageIcon: Icon = (failCount === 0) ? 'layers_green' : 'layers_red';
 
     console.log(
       'Updating \'issues\' database:\n',
@@ -590,7 +614,7 @@ export async function updateNotionDatabases() {
       database_id: config.notionIssuesDB as string,
       icon: {
         type: 'external',
-        external: { url: `https://www.notion.so/icons/${issuePageIcon}.svg` },
+        external: { url: getIconUrl(issuePageIcon) },
       },
     });
   };
