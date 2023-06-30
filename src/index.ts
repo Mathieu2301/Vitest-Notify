@@ -49,7 +49,10 @@ export default class CustomReporter implements Reporter {
   }
 
   async onFinished(files?: File[], errors?: unknown[]): Promise<void> {
-    if (!enabled) return;
+    if (!enabled) {
+      console.log('No VitestNotify agent configured. Skipping...');
+      return;
+    }
 
     let changes: Changes | undefined;
 
