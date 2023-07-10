@@ -145,6 +145,10 @@ export interface Change {
   pageId: string;
 }
 
+const ignoredFields: { [type in TextType]?: string[] } = {
+  issues: ['test', 'status'],
+};
+
 const getTemplateLanguage = (properties: { [type in TextType]?: string[] }): Language => {
   const missingColumns: {
     [lang in Language]: [TextType, string][];
@@ -155,10 +159,16 @@ const getTemplateLanguage = (properties: { [type in TextType]?: string[] }): Lan
     missingColumns[lang] = [];
     for (const _type in properties) {
       const type = _type as TextType;
-      missingColumns[lang].push(...(Object
-        .values(i8nLangs[lang][type])
-        .filter((column) => !properties[type]?.includes(column))
-        .map((column) => [type, column] as [TextType, string])
+      const texts = i8nLangs[lang][type];
+
+      missingColumns[lang].push(...(
+        (
+          Object.keys(texts) as (keyof typeof texts)[]
+        )
+        .filter((columnId) => !ignoredFields[type]?.includes(columnId))
+        .map((columnId) => texts[columnId])
+        .filter((columnName) => !properties[type]?.includes(columnName))
+        .map((columnName) => [type, columnName] as [TextType, string])
       ));
     }
     if (missingColumns[lang]?.length === 0) return lang;
@@ -174,12 +184,27 @@ const getTemplateLanguage = (properties: { [type in TextType]?: string[] }): Lan
 
   console.log('Detected language:', nearestLang.toUpperCase());
 
+  const invalidDBs = (missingColumns[nearestLang]
+    .map(([type]) => type)
+    .reduce((prev, curr) => {
+      if (!prev.includes(curr)) return [...prev, curr];
+      return prev;
+    }, [] as TextType[])
+  );
+
   console.error(
-    'Missing column(s):\n',
-    ...missingColumns[nearestLang].map(([type, column]) =>
-      `- the '${type}' database needs a column named '${column}'\n`,
-    ),
-    '\nThis Notion database is not supported, please use the default template.\n',
+    `\nInvalid database(s):\n`,
+    ...invalidDBs.map((wrongType: TextType) => [
+      `- '${wrongType}':\n`,
+      `  Current columns:\n`,
+      ...properties[wrongType].map((column: string) => `    - '${column}'\n`),
+      `  Missing columns:\n`,
+      ...(missingColumns[nearestLang]
+        .filter(([type]) => type === wrongType)
+        .map(([, column]) => `    - '${column}'\n`)
+      ),
+      `  You should use the default template.\n`
+    ]).flat(),
   );
   process.exit(1);
 }
@@ -208,7 +233,8 @@ export async function setupNotionDatabases() {
   const testProperty = issuesDB.properties[i8n.issues.test];
 
   if (
-    testProperty.type !== 'relation'
+    !testProperty
+    || testProperty.type !== 'relation'
     || testProperty.relation?.database_id.replace(/-/g, '') !== config.notionTestsDB
   ) {
     console.log(`Setting '${i8n.issues.test}' property as a relation...`);
@@ -374,7 +400,10 @@ export async function updateNotionTestsDB(files?: File[]) {
     if (page && page.id) {
       updated.add(page.id);
 
-      if (!needUpdate(page, { properties: params.properties })) {
+      if (!needUpdate(page, {
+        properties: params.properties,
+        icon: params.icon,
+      })) {
         stats.kept += 1;
         continue;
       }

@@ -44,7 +44,7 @@ export default class CustomReporter implements Reporter {
 
     console.log('Custom reporter enabled. Using these agents:');
     for (const [agent, available] of Object.entries(agents)) {
-      if (available) console.log(`- ${agent}`);
+      if (available) console.log(` - ${agent}`);
     }
   }
 
