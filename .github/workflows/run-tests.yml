@@ -16,7 +16,7 @@ jobs:
       run: yarn build
     - name: Run
       env:
-        VITEST_NAMESPACE: ${{ secrets.VITEST_NAMESPACE }}
+        VITEST_NAMESPACE: VitestNotify
 
         TELEGRAM_KEY: ${{ secrets.TELEGRAM_KEY }}
         TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
@@ -26,6 +26,6 @@ jobs:
         SURGE_URL: ${{ secrets.SURGE_URL }}
 
         NOTION_KEY: ${{ secrets.NOTION_KEY }}
-        NOTION_TESTS_DB: ${{ secrets.NOTION_TESTS_DB }}
-        NOTION_ISSUES_DB: ${{ secrets.NOTION_ISSUES_DB }}
+        NOTION_TESTS_DB: 41d1329f2d214f078484d3a089746cd9
+        NOTION_ISSUES_DB: b73c2e4d536746d4bb94dd38b812d835
       run: yarn test
