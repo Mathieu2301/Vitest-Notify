@@ -94,13 +94,13 @@ export default class CustomReporter implements Reporter {
       console.log(`Report uploaded to '${reportUrl}'`);
     }
 
-    const stacks = getStacks(files ?? []);
+    const stacks = await getStacks(files ?? []);
 
     let notionUrls: PagesUrls = {};
 
     if (notionAvailable) {
       console.log('Sending issues to Notion...');
-      notionUrls = await updateNotionIssuesDB(stacks, changes as Changes, reportUrl);
+      notionUrls = await updateNotionIssuesDB(stacks, changes, reportUrl);
 
       console.log('Updating databases names and icons...');
       await updateNotionDatabases();

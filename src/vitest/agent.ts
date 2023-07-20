@@ -4,13 +4,13 @@ import type { File, Task } from 'vitest';
 export function generateCodeSnippet({
   filepath,
   line,
-  column,
+  column = 0,
   markdownMode,
   contextSize = 3,
 }: {
   filepath: string;
   line: number;
-  column: number;
+  column?: number;
   markdownMode: boolean;
   contextSize?: number;
 }) {
@@ -42,8 +42,8 @@ export interface Stack {
     name: string;
     path: string;
   };
-  line: number;
-  column: number;
+  line?: number;
+  column?: number;
   path: string[];
   error: {
     name: string;
@@ -52,7 +52,7 @@ export interface Stack {
   };
 }
 
-export function getStacks(files: File[]): Stack[] {
+export async function getStacks(files: File[]): Promise<Stack[]> {
   const stacks: Stack[] = [];
 
   const tasks: {
@@ -73,25 +73,45 @@ export function getStacks(files: File[]): Stack[] {
       for (const subtask of subtasks) {
         tasks.push({ task: subtask, path: [...path, subtask.name] });
       }
+      continue;
     }
 
     for (const error of task.result?.errors ?? []) {
-      for (const stack of error?.stacks ?? []) {
+      const errorInfo = {
+        id: task.id,
+        file: {
+          id: task.file?.id ?? '',
+          name: task.file?.name ?? '',
+          path: task.file?.filepath ?? '',
+        },
+        path,
+        error: {
+          name: error.name,
+          message: error.message,
+          diff: error.diff,
+        },
+      };
+
+      let i = 0;
+      const max = 5;
+      while (!error.stacks || !error.stacks.length) {
+        console.log(`Waiting for stacks to be available, ${i}/${max}...`);
+        i -= 1;
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        if (i > max) {
+          console.log('No stacks available for task:', task.name);
+          stacks.push(errorInfo);
+          break;
+        }
+      }
+
+      for (const stack of error.stacks) {
         stacks.push({
-          id: task.id,
-          file: {
-            id: task.file?.id ?? '',
-            name: task.file?.name ?? '',
-            path: task.file?.filepath ?? '',
-          },
+          ...errorInfo,
           line: stack.line,
           column: stack.column,
-          path,
-          error: {
-            name: error.name,
-            message: error.message,
-            diff: error.diff,
-          },
         });
       }
     }

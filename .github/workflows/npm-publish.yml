@@ -27,6 +27,8 @@ jobs:
           registry-url: https://registry.npmjs.org/
       - run: yarn install --frozen-lockfile
       - run: yarn build
-      - run: npm publish
+      - run: yarn config set version-git-tag false
+      - run: yarn config set version-tag-prefix ""
+      - run: yarn publish --new-version ${{ github.event.release.tag_name }}
         env:
-          NODE_AUTH_TOKEN: ${{secrets.npm_token}}
+          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}

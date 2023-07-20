@@ -28,3 +28,23 @@ describe('10', () => {
   });
 });
 
+describe('alwaysFail', () => {
+  it('should fail', () => {
+    expect(true).toBe(false);
+  });
+});
+
+describe('randomFail', () => {
+  it('should fail randomly', () => {
+    expect(Math.random() > 0.5).toBe(true);
+  });
+
+  it('should fail randomly 2', () => {
+    expect(Math.random() > 0.5).toBe(true);
+  });
+
+  it('should fail randomly 3', () => {
+    expect(Math.random() > 0.5).toBe(true);
+  });
+});
+

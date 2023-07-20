@@ -1,76 +1,20 @@
-import { Client } from '@notionhq/client';
+import Notion from './DatabaseController';
 import env from '../config';
 import { generateCodeSnippet, type Stack } from '../vitest/agent';
+import { getIconUrl, type Icon } from './NotionDatabase';
+import {
+  statusIconsUrls,
+  type TestStatus,
+  type TestPage,
+  type NewTestPage,
+} from './databases/TestsDatabase';
 import type { File, Task } from 'vitest';
-import type { CreatePageParameters, UpdatePageParameters } from '@notionhq/client/build/src/api-endpoints';
-
-interface LangTexts {
-  tests: {
-    name: string;
-    tag: string;
-    fileName: string;
-    status: string;
-    project: string;
-    archived: string;
-  };
-  issues: {
-    name: string;
-    test: string;
-    status: string;
-  };
-  texts: {
-    automaticTests: string;
-  };
-}
-
-const i8nLangs = {
-  EN: {
-    tests: {
-      name: 'Name',
-      fileName: 'File',
-      tag: 'Tag',
-      status: 'Status',
-      project: 'Project',
-      archived: 'Archived',
-    },
-    issues: {
-      name: 'Message',
-      test: 'Associated test',
-      status: 'Test status',
-    },
-    texts: {
-      automaticTests: 'Automatic tests',
-    },
-  } as LangTexts,
-  FR: {
-    tests: {
-      name: 'Nom',
-      fileName: 'Fichier',
-      tag: 'Tag',
-      status: 'État',
-      project: 'Projet',
-      archived: 'Archivé',
-    },
-    issues: {
-      name: 'Message',
-      test: 'Test associé',
-      status: 'État du test',
-    },
-    texts: {
-      automaticTests: 'Tests automatiques',
-    },
-  } as LangTexts,
-} as const;
-
-type Language = keyof typeof i8nLangs;
-type TextType = keyof LangTexts;
 
 const config = {
   namespace: env('VITEST_NAMESPACE'),
   notionKey: env('NOTION_KEY'),
   notionTestsDB: env('NOTION_TESTS_DB'),
   notionIssuesDB: env('NOTION_ISSUES_DB'),
-  notionLanguage: 'EN' as Language,
 };
 
 export const available = (
@@ -80,47 +24,24 @@ export const available = (
   && !!config.namespace
 );
 
-const client = new Client({
+const notion = new Notion({
   auth: config.notionKey,
+  dbIDs: {
+    issues: config.notionIssuesDB,
+    tests: config.notionTestsDB,
+  },
 });
 
-type IconName = (
-  | 'question-mark'
-  | 'checkmark'
-  | 'clear'
-  | 'code'
-  | 'playback-pause'
-  | 'playback-play'
-  | 'checklist'
-  | 'list'
-  | 'layers'
-);
-
-type IconColor = (
-  | 'green'
-  | 'blue'
-  | 'yellow'
-  | 'red'
-  | 'pink'
-  | 'gray'
-);
-
-type Icon = `${IconName}_${IconColor}`;
-type IconUrl = `https://www.notion.so/icons/${Icon}.svg`;
-
-const getIconUrl = (icon: Icon): IconUrl => `https://www.notion.so/icons/${icon}.svg`;
-
-type TestStatus = 'PASS' | 'FAIL' | 'SKIP' | 'TODO' | 'ONLY' | 'RUN' | 'UNKNOWN';
-
-const statusIconsUrls: { [status in TestStatus]: IconUrl } = {
-  PASS: getIconUrl('checkmark_green'),
-  FAIL: getIconUrl('clear_red'),
-  SKIP: getIconUrl('playback-pause_blue'),
-  TODO: getIconUrl('code_pink'),
-  ONLY: getIconUrl('checkmark_blue'),
-  RUN: getIconUrl('playback-play_gray'),
-  UNKNOWN: getIconUrl('question-mark_yellow'),
-} as const;
+function getNewActiveValue(
+	newStatus: TestStatus,
+	oldStatus?: TestStatus,
+	oldActive?: boolean,
+) {
+  const passOrFail = Array.prototype.includes.bind(['PASS', 'FAIL']);
+	if (!passOrFail(newStatus)) return false;
+	if (!oldStatus || !passOrFail(oldStatus)) return true;
+	return oldActive;
+}
 
 interface Test {
   /** Task ID */
@@ -143,115 +64,16 @@ export interface Change {
   status: TestStatus;
   pageUrl: string;
   pageId: string;
-}
-
-const ignoredFields: { [type in TextType]?: string[] } = {
-  issues: ['test', 'status'],
-};
-
-const getTemplateLanguage = (properties: { [type in TextType]?: string[] }): Language => {
-  const missingColumns: {
-    [lang in Language]: [TextType, string][];
-  } = {} as any;
-
-  for (const _lang in i8nLangs) {
-    const lang = _lang as Language;
-    missingColumns[lang] = [];
-    for (const _type in properties) {
-      const type = _type as TextType;
-      const texts = i8nLangs[lang][type];
-
-      missingColumns[lang].push(...(
-        (
-          Object.keys(texts) as (keyof typeof texts)[]
-        )
-        .filter((columnId) => !ignoredFields[type]?.includes(columnId))
-        .map((columnId) => texts[columnId])
-        .filter((columnName) => !properties[type]?.includes(columnName))
-        .map((columnName) => [type, columnName] as [TextType, string])
-      ));
-    }
-    if (missingColumns[lang]?.length === 0) return lang;
-  }
-
-  const nearestLang = Object.keys(missingColumns).reduce((_prev, _curr) => {
-    if (!_prev) return _curr;
-    const curr = _curr as Language;
-    const prev = _prev as Language;
-    if (missingColumns[curr]?.length < missingColumns[prev]?.length) return curr;
-    return prev;
-  }, '' as Language) as Language;
-
-  console.log('Detected language:', nearestLang.toUpperCase());
-
-  const invalidDBs = (missingColumns[nearestLang]
-    .map(([type]) => type)
-    .reduce((prev, curr) => {
-      if (!prev.includes(curr)) return [...prev, curr];
-      return prev;
-    }, [] as TextType[])
-  );
-
-  console.error(
-    `\nInvalid database(s):\n`,
-    ...invalidDBs.map((wrongType: TextType) => [
-      `- '${wrongType}':\n`,
-      `  Current columns:\n`,
-      ...properties[wrongType].map((column: string) => `    - '${column}'\n`),
-      `  Missing columns:\n`,
-      ...(missingColumns[nearestLang]
-        .filter(([type]) => type === wrongType)
-        .map(([, column]) => `    - '${column}'\n`)
-      ),
-      `  You should use the default template.\n`
-    ]).flat(),
-  );
-  process.exit(1);
+  priority: string;
+  assigned: { id: string }[];
+  active: boolean;
+  isNewTest: boolean;
 }
 
 export async function setupNotionDatabases() {
   if (!available) throw new Error('Notion is not available');
 
-  console.log('Getting \'tests\' database...');
-  const testsDB = await client.databases.retrieve({
-    database_id: config.notionTestsDB as string,
-  });
-
-  console.log('Getting \'issues\' database...');
-  const issuesDB = await client.databases.retrieve({
-    database_id: config.notionIssuesDB as string,
-  });
-
-  config.notionLanguage = getTemplateLanguage({
-    tests: Object.keys(testsDB.properties),
-    issues: Object.keys(issuesDB.properties),
-  });
-  
-  console.log(`Using language '${config.notionLanguage}'`);
-
-  const i8n = i8nLangs[config.notionLanguage];
-  const testProperty = issuesDB.properties[i8n.issues.test];
-
-  if (
-    !testProperty
-    || testProperty.type !== 'relation'
-    || testProperty.relation?.database_id.replace(/-/g, '') !== config.notionTestsDB
-  ) {
-    console.log(`Setting '${i8n.issues.test}' property as a relation...`);
-    await client.databases.update({
-      database_id: config.notionIssuesDB as string,
-      properties: {
-        [i8n.issues.test]: {
-          relation: {
-            database_id: config.notionTestsDB as string,
-            type: 'single_property',
-            single_property: {},
-          },
-        },
-      },
-    });
-  }
-
+  await notion.setup();
   console.log('Notion database is ready');
 };
 
@@ -273,7 +95,6 @@ const needUpdate = (base: any, reference: any) => {
 export async function updateNotionTestsDB(files?: File[]) {
   if (!available) throw new Error('Notion is not available');
 
-  const i8n = i8nLangs[config.notionLanguage];
   const tests: Test[] = [];
 
   const tasks: {
@@ -329,15 +150,9 @@ export async function updateNotionTestsDB(files?: File[]) {
 
   // Update database
 
-  const { results: testPages } = await client.databases.query({
-    database_id: config.notionTestsDB as string,
-    // filter by namespace
-    filter: {
-      property: i8n.tests.project,
-      select: {
-        equals: config.namespace as string,
-      },
-    },
+  const { results: testPages } = await notion.tests.getRows({
+    property: 'project',
+    select: { equals: config.namespace },
   });
 
   const updated = new Set<string>();
@@ -351,92 +166,95 @@ export async function updateNotionTestsDB(files?: File[]) {
   };
 
   for (const test of tests) {
-    const params: CreatePageParameters | UpdatePageParameters = {
-      parent: {
-        database_id: config.notionTestsDB as string,
-      },
-      properties: {
-        [i8n.tests.name]: { title: [{ text: { content: test.title } }] },
-        [i8n.tests.tag]: { select: { name: test.tag } },
-        [i8n.tests.fileName]: { select: { name: test.fileName } },
-        [i8n.tests.status]: { status: { name: test.status } },
-        [i8n.tests.project]: { select: { name: config.namespace as string } },
-        [i8n.tests.archived]: { checkbox: false },
-      },
-      icon: {
-        type: 'external',
-        external: { url: statusIconsUrls[test.status] ?? statusIconsUrls.UNKNOWN },
-      },
-    };
-
-    let pages = testPages.filter((page) =>
-      (page as any).properties?.[i8n.tests.name]?.title?.[0]?.plain_text === test.title,
+    let pages = testPages.filter(
+      (page) => page.properties.name.title[0].text.content === test.title,
     );
 
     // Filter by tag if multiple pages with the same name exist
     if (pages.length > 1) {
-      pages = pages.filter((page) =>
-        (page as any).properties?.[i8n.tests.tag]?.select?.name === test.tag,
+      pages = pages.filter(
+        (page) => page.properties.tag.select.name === test.tag,
       );
     }
 
     // Filter by file name if multiple pages with the same name and tag exist
     if (pages.length > 1) {
-      pages = pages.filter((page) =>
-        (page as any).properties?.[i8n.tests.fileName]?.select?.name === test.fileName,
+      pages = pages.filter(
+        (page) => page.properties.fileName.select.name === test.fileName,
       );
     }
 
     // Show an error if multiple pages with the same name, tag and file name exist
     if (pages.length > 1) {
       console.error(`The '${test.filePath}' file has multiple (${pages.length}) tests with the same name '${test.title}'`);
-      console.error('please check this file for duplicates and remove them');
+      console.error('please check this file for duplicate tests and rename/remove them');
     }
 
     const page = pages.filter((page) => !updated.has(page.id))[0];
 
-    // If page exists, update it
+    const newActive = getNewActiveValue(
+      test.status,
+      page.properties.status.status.name as TestStatus,
+      page.properties.active.checkbox,
+    );
+
+    const params: NewTestPage = {
+      properties: {
+        name: { title: [{ text: { content: test.title } }] },
+        tag: { select: { name: test.tag } },
+        fileName: { select: { name: test.fileName } },
+        status: { status: { name: test.status } },
+        project: { select: { name: config.namespace as string } },
+        archived: { checkbox: false },
+        active: { checkbox: newActive },
+      },
+      icon: statusIconsUrls[test.status] ?? statusIconsUrls.UNKNOWN,
+    };
+
+    const genChange = (testOldPage: TestPage, isNewTest: boolean): Change => ({
+      id: test.id,
+      path: test.path,
+      status: test.status,
+      pageId: testOldPage.id,
+      pageUrl: testOldPage.url,
+      priority: testOldPage.properties.priority.select?.name ?? null,
+      assigned: testOldPage.properties.assigned.people.map(({ id }) => ({ id })),
+      active: testOldPage.properties.active.checkbox || newActive,
+      isNewTest,
+    });
+
+    // If a page exists, update it
     // else, create it
     if (page && page.id) {
       updated.add(page.id);
 
       if (!needUpdate(page, {
         properties: params.properties,
-        icon: params.icon,
+        icon: {
+          type: 'external',
+          external: { url: getIconUrl(params.icon) },
+        },
       })) {
         stats.kept += 1;
         continue;
       }
 
       console.log(`Updating page '${test.title}'`);
-      await client.pages.update({
+      await notion.tests.editRow({
+        id: page.id,
         ...params,
-        page_id: page.id,
       });
 
-      const url = (page as { url: string }).url;
-      stats.updated.push(url);
-
-      changes[test.id] = {
-        id: test.id,
-        path: test.path,
-        status: test.status,
-        pageId: page.id,
-        pageUrl: (page as { url: string }).url,
-      };
+      stats.updated.push(page.url);
+      const change = genChange(page, false);
+      if (change.active) changes[test.id] = change;
     } else {
       console.log(`Creating page '${test.title}'`);
-      const page = await client.pages.create({
-        ...params,
-        parent: {
-          database_id: config.notionTestsDB as string,
-        },
-      });
+      const page = await notion.tests.createRow(params);
 
+      changes[test.id] = genChange(page, true);
       updated.add(page.id);
-
-      const url = (page as { url: string }).url;
-      stats.created.push(url);
+      stats.created.push(page.url);
     }
   }
 
@@ -445,20 +263,19 @@ export async function updateNotionTestsDB(files?: File[]) {
     if (
       !page.id
       || updated.has(page.id)
-      || (page as any).properties?.[i8n.tests.archived]?.checkbox
+      || page.properties.archived.checkbox
     ) continue;
 
-    console.log(`Archiving page '${(page as any).properties?.[i8n.tests.name]?.title?.[0]?.plain_text}'`);
+    console.log(`Archiving page '${page.properties.name.title?.[0].text.content}'`);
 
-    await client.pages.update({
-      page_id: page.id,
+    await notion.tests.editRow({
+      id: page.id,
       properties: {
-        [i8n.tests.archived]: { checkbox: true },
+        archived: { checkbox: true },
       },
     });
 
-    const url = (page as { url: string }).url;
-    stats.archived.push(url);
+    stats.archived.push(page.url);
   }
 
   // Log stats
@@ -486,10 +303,8 @@ export interface PagesUrls {
 export async function updateNotionIssuesDB(stacks: Stack[], changes: Changes, reportUrl?: string): Promise<PagesUrls> {
   if (!available) throw new Error('Notion is not available');
 
-  const i8n = i8nLangs[config.notionLanguage];
   const pagesUrls: PagesUrls = {};
-
-  const newStacks = stacks.filter((stack) => changes[stack.id])
+  const newStacks = stacks.filter((stack) => changes[stack.id]);
 
   for (const stack of Object.values(newStacks)) {
     const stackName = `${stack.error.name}: ${stack.error.message}`;
@@ -500,28 +315,23 @@ export async function updateNotionIssuesDB(stacks: Stack[], changes: Changes, re
       ` for test page: ${changes[stack.id].pageUrl}`,
     );
 
-    const newPage = await client.pages.create({
-      parent: {
-        database_id: config.notionIssuesDB as string,
-      },
+    const newPage = await notion.issues.createRow({
       properties: {
-        [i8n.issues.name]: { title: [
-          {
-            text: {
-              content: stackName,
-            },
-            annotations: {
-              bold: true,
-              strikethrough: true,
-              color: 'red',
-            },
-          }
-        ] },
-        [i8n.issues.test]: { relation: [{
+        name: { title: [{
+          text: {
+            content: stackName,
+          },
+        }] },
+        test: { relation: [{
           id: changes[stack.id].pageId,
         }] },
+        priority: (changes[stack.id].priority
+          ? { select: { name: changes[stack.id].priority } }
+          : undefined
+        ),
+        assigned: { people: changes[stack.id].assigned },
       },
-      children: [
+      content: [
         {
           object: 'block',
           type: 'heading_2',
@@ -538,21 +348,23 @@ export async function updateNotionIssuesDB(stacks: Stack[], changes: Changes, re
               type: 'text',
               text: {
                 content: [
-                  `[FAIL] ${stack.path.map((p) => `${p}`).join('\n  > ')}`,
+                  stack.path.map((p) => `${p}`).join('\n  > '),
                   '',
                   `${stack.error.name}: ${stack.error.message}`,
                   `  ❯ ${stack.file.name}:${stack.line}:${stack.column}`,
                   '',
-                  generateCodeSnippet({
-                    filepath: stack.file.path,
-                    line: stack.line,
-                    column: stack.column,
-                    markdownMode: false,
-                    contextSize: 10,
-                  }),
-                  '',
+                  (stack.line
+                    ? `${generateCodeSnippet({
+                      filepath: stack.file.path,
+                      line: stack.line,
+                      column: stack.column,
+                      markdownMode: false,
+                      contextSize: 10,
+                    })}\n`
+                    : null
+                  ),
                   stack.error.diff?.replace(/\x1B\[\d+m/g, '') ?? null,
-                ].join('\n'),
+                ].filter((line) => line !== null).join('\n'),
               },
             }],
           },
@@ -577,12 +389,8 @@ export async function updateNotionIssuesDB(stacks: Stack[], changes: Changes, re
       ],
     });
 
-    console.log(` => ${(newPage as { url: string }).url}`);
-
-    pagesUrls[stack.id] = {
-      id: newPage.id,
-      url: (newPage as { url: string }).url,
-    };
+    console.log(` => ${newPage.url}`);
+    pagesUrls[stack.id] = { id: newPage.id, url: newPage.url };
   }
 
   return pagesUrls;
@@ -591,61 +399,62 @@ export async function updateNotionIssuesDB(stacks: Stack[], changes: Changes, re
 export async function updateNotionDatabases() {
   if (!available) throw new Error('Notion is not available');
 
-  const i8n = i8nLangs[config.notionLanguage];
-
-  // Update 'tests' database title and icon
+  // Update databases titles and icons
   {
     console.log('Getting \'tests\' database...');
-    const { results: testPages } = await client.databases.query({
-      database_id: config.notionTestsDB as string,
-      filter: {
-        property: i8n.tests.archived,
-        checkbox: {
-          equals: false,
-        },
-      },
+    const { results: testPages } = await notion.tests.getRows({
+      and: [
+        { property: 'archived', checkbox: { equals: false } },
+        { property: 'active', checkbox: { equals: true } },
+      ],
     });
 
-    const statuses = testPages.map((page) => (page as any).properties?.[i8n.tests.status]?.status?.name);
-    const passCount = statuses.filter((status) => status === 'PASS').length;
-    const failCount = statuses.filter((status) => status === 'FAIL').length;
-    const totalCount = passCount + failCount;
+    const statuses = testPages.map((page) => page.properties.status.status.name);
+    const passCount = statuses.filter((status: TestStatus) => status === 'PASS').length;
+    const totalCount = statuses.length;
 
-    const pageIcon: Icon = (failCount === 0) ? 'checklist_green' : 'list_red';
-    const newTitle = `${i8n.texts.automaticTests}: ${passCount}/${totalCount}`;
+    const pageIcon: Icon = (passCount === totalCount) ? 'checklist_green' : 'list_red';
+    const oldTitleObject = (await notion.tests.getHeader()).title;
+    const counterFormat = /[0-9]+\/[0-9]+/;
+
+    const titleHasCounter = oldTitleObject.some(
+      (obj) => obj.type === 'text' && counterFormat.test(obj.text.content),
+    );
+
+    let newTitleObject: typeof oldTitleObject | undefined;
+    let newTitleFullText: string | undefined;
+
+    if (titleHasCounter) {
+      newTitleObject = oldTitleObject.map((obj) => {
+        if (obj.type !== 'text') return null;
+        obj.text.content = obj.text.content.replace(counterFormat, `${passCount}/${totalCount}`);
+        return obj;
+      }).filter((obj) => obj);
+
+      newTitleFullText = newTitleObject.map(
+        (obj) => obj.type === 'text' ? obj.text.content : '',
+      ).join('');
+    }
 
     console.log(
       'Updating \'tests\' database:\n',
-      ` title: '${newTitle}'\n`,
+      ...(newTitleFullText ? [` title: '${newTitleFullText}'\n`] : []),
       ` icon: ${pageIcon}`,
     );
 
-    await client.databases.update({
-      database_id: config.notionTestsDB as string,
-      title: [{
-        type: 'text',
-        text: { content: newTitle },
-      }],
-      icon: {
-        type: 'external',
-        external: { url: getIconUrl(pageIcon) },
-      },
+    await notion.tests.editHeader({
+      title: newTitleObject,
+      icon: pageIcon,
     });
 
-    const issuePageIcon: Icon = (failCount === 0) ? 'layers_green' : 'layers_red';
+    const issuePageIcon: Icon = `layers_${(passCount === totalCount) ? 'green' : 'red'}`
 
     console.log(
       'Updating \'issues\' database:\n',
       ` icon: ${issuePageIcon}`,
     );
 
-    await client.databases.update({
-      database_id: config.notionIssuesDB as string,
-      icon: {
-        type: 'external',
-        external: { url: getIconUrl(issuePageIcon) },
-      },
-    });
+    await notion.issues.editHeader({ icon: issuePageIcon });
   };
 };
 

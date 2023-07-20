@@ -1,6 +1,7 @@
 import https from 'https';
 import { generateCodeSnippet, type Stack } from '../vitest/agent';
 import type { Changes, PagesUrls } from '../notion/agent';
+import type { TestStatus } from '../notion/databases/TestsDatabase';
 
 const config = {
   namespace: process.env.VITEST_NAMESPACE,
@@ -13,6 +14,18 @@ export const available = (
   && !!config.key
   && !!config.chat
 );
+
+const statusEmojis: {
+  [status in TestStatus]: string;
+} = {
+  PASS: '✅',
+  FAIL: '❌',
+  SKIP: '⏭️',
+  TODO: '📝',
+  ONLY: '🔥',
+  RUN: '⌛️',
+  UNKNOWN: '❓',
+};
 
 interface TelegramReportOptions {
   stacks: Stack[];
@@ -27,20 +40,22 @@ export async function sendTelegramReport(
   if (!available) throw new Error('Telegram is not available');
 
   const report = (stacks
-    .filter((stack) => changes && changes[stack.id])
+    .filter((stack) => !changes || changes[stack.id])
     .map((stack) => [
-      `*[FAIL]* ${stack.path.map((p) => `\`${p}\``).join('\n  > ')}`,
+      `${statusEmojis.FAIL} *[FAIL]* ${stack.path.map((p) => `\`${p}\``).join('\n  > ')}`,
       '',
       `*${stack.error.name}*: \`${stack.error.message}\``,
       `  ❯ \`${stack.file.name}:${stack.line}:${stack.column}\``,
       '',
-      generateCodeSnippet({
-        filepath: stack.file.path,
-        line: stack.line,
-        column: stack.column,
-        markdownMode: true
-      }),
-      '',
+      (stack.line
+        ? `${generateCodeSnippet({
+          filepath: stack.file.path,
+          line: stack.line,
+          column: stack.column,
+          markdownMode: true,
+        })}\n`
+        : null
+      ),
       stack.error.diff?.replace(/\x1B\[\d+m/g, '') ?? null,
       '',
       (reportUrl
@@ -60,13 +75,19 @@ export async function sendTelegramReport(
   for (const change of Object.values(changes ?? {})) {
     if (stacks.find((stack) => stack.id === change.id)) continue;
 
+    const newEmoji = change.isNewTest ? '🆕 ' : '';
+    const emoji = statusEmojis[change.status] ?? statusEmojis.UNKNOWN;
+
     report.push(
-      `*[${change.status}]* ${change.path.map((p) => `\`${p}\``).join('\n  > ')}`,
+      `${newEmoji}${emoji} *[${change.status}]* ${change.path.map((p) => `\`${p}\``).join('\n  > ')}`,
       '',
     );
   }
 
-  if (report.length === 0) return;
+  if (report.length === 0) {
+    console.log('No report to send');
+    return;
+  }
 
   report.unshift(`======= *${config.namespace}* =======`, '');
 
