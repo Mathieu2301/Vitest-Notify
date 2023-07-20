@@ -28,13 +28,13 @@ describe('10', () => {
   });
 });
 
-describe('alwaysFail', () => {
+describe.skip('alwaysFail', () => {
   it('should fail', () => {
     expect(true).toBe(false);
   });
 });
 
-describe('randomFail', () => {
+describe.skip('randomFail', () => {
   it('should fail randomly', () => {
     expect(Math.random() > 0.5).toBe(true);
   });
