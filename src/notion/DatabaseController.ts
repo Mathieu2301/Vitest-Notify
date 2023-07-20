@@ -21,13 +21,13 @@ export default class DatabaseController {
   constructor({ auth, dbIDs }: DatabaseControllerConfig) {
     this.client = new Client({
       auth,
-      fetch: async (url: string, init?: RequestInit) => {
+      async fetch(url: string, init?: RequestInit) {
         try {
           const res = await fetch(url, init);
           if (!res.ok) throw new Error();
           return res;
-        } catch (err) {
-          console.warn('Notion API error, retrying...');
+        } catch {
+          console.warn(`\nNotion API error (${url}), retrying...\n`);
           await new Promise((resolve) => setTimeout(resolve, 1000));
           return fetch(url, init);
         }
