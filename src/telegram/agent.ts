@@ -34,15 +34,19 @@ interface TelegramReportOptions {
   notionUrls: PagesUrls;
 }
 
+const pathFormat = (path: string[]) => path.map((p) => `\`${p}\``).join('\n  > ');
+
 export async function sendTelegramReport(
   { stacks, changes, reportUrl, notionUrls }: TelegramReportOptions,
 ) {
   if (!available) throw new Error('Telegram is not available');
 
+  const getNewEmoji = (stack: Stack) => (changes?.[stack.id]?.isNewTest ? '🆕' : '');
+
   const report = (stacks
     .filter((stack) => !changes || changes[stack.id])
     .map((stack) => [
-      `${statusEmojis.FAIL} *[FAIL]* ${stack.path.map((p) => `\`${p}\``).join('\n  > ')}`,
+      `${getNewEmoji(stack)}${statusEmojis.FAIL} *[FAIL]* ${pathFormat(stack.path)}`,
       '',
       `*${stack.error.name}*: \`${stack.error.message}\``,
       `  ❯ \`${stack.file.name}:${stack.line}:${stack.column}\``,
@@ -75,11 +79,11 @@ export async function sendTelegramReport(
   for (const change of Object.values(changes ?? {})) {
     if (stacks.find((stack) => stack.id === change.id)) continue;
 
-    const newEmoji = change.isNewTest ? '🆕 ' : '';
+    const newEmoji = change.isNewTest ? '🆕' : '';
     const emoji = statusEmojis[change.status] ?? statusEmojis.UNKNOWN;
 
     report.push(
-      `${newEmoji}${emoji} *[${change.status}]* ${change.path.map((p) => `\`${p}\``).join('\n  > ')}`,
+      `${newEmoji}${emoji} *[${change.status}]* ${pathFormat(change.path)}`,
       '',
     );
   }

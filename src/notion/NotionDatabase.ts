@@ -386,7 +386,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
       logger.error([
         '  Invalid schema:',
         ...issues.map((issue) => {
-          if (issue.issue === 'missing') return `    - Missing property '${issue.propName}' (type: ${issue.requiredType}))`;
+          if (issue.issue === 'missing') return `    - Missing property '${issue.propName}' (type: ${issue.requiredType})`;
           return `    - Invalid type for property '${issue.propName}': expected '${issue.requiredType}', got '${issue.propType}'`;
         }),
       ].join('\n'));

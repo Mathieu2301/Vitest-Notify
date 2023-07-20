@@ -192,10 +192,13 @@ export async function updateNotionTestsDB(files?: File[]) {
 
     const page = pages.filter((page) => !updated.has(page.id))[0];
 
-    const newActive = getNewActiveValue(
-      test.status,
-      page.properties.status.status.name as TestStatus,
-      page.properties.active.checkbox,
+    const newActive = (page
+      ? getNewActiveValue(
+        test.status,
+        page.properties.status.status.name as TestStatus,
+        page.properties.active.checkbox,
+      )
+      : getNewActiveValue(test.status)
     );
 
     const params: NewTestPage = {

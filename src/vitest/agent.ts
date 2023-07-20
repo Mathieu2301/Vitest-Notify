@@ -52,6 +52,31 @@ export interface Stack {
   };
 }
 
+function findEquivalentStack(obj: any) {
+  const isStackObject = (testObj: any) => {
+    const keys = Object.keys(testObj);
+    return ['column', 'line', 'file'].every((key) => keys.includes(key));
+  };
+
+  const seenPaths = new Set();
+
+  const recurse = (obj: any): any => {
+    if (isStackObject(obj)) return obj;
+
+    for (const v of Object.values(obj)) {
+      if (typeof v !== 'object') continue;
+      if (seenPaths.has(v)) continue;
+      seenPaths.add(v);
+      const result = recurse(v);
+      if (result) return result;
+    }
+  }
+
+  return recurse(obj);
+}
+
+let stackWaitI = 0;
+
 export async function getStacks(files: File[]): Promise<Stack[]> {
   const stacks: Stack[] = [];
 
@@ -92,22 +117,41 @@ export async function getStacks(files: File[]): Promise<Stack[]> {
         },
       };
 
-      let i = 0;
       const max = 5;
-      while (!error.stacks || !error.stacks.length) {
-        console.log(`Waiting for stacks to be available, ${i}/${max}...`);
-        i -= 1;
+      while ((!error.stacks || !error.stacks.length) && stackWaitI <= max) {
+        if (stackWaitI >= max) {
+          console.log('No stacks available for task:\n  ', errorInfo.path.join(' > '));
 
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+          console.log('  Finding equivalent stack...');
+          const equivalentStack = findEquivalentStack(task);
 
-        if (i > max) {
-          console.log('No stacks available for task:', task.name);
-          stacks.push(errorInfo);
+          if (!equivalentStack) {
+            console.warn('  No equivalent stack found.');
+            stacks.push(errorInfo);
+            break;
+          }
+
+          console.log(
+            '  Equivalent stack found:',
+            `${equivalentStack.file}:${equivalentStack.line}:${equivalentStack.column}`,
+          );
+
+          stacks.push({
+            ...errorInfo,
+            line: equivalentStack.line,
+            column: equivalentStack.column,
+          });
+
           break;
         }
+
+        console.log(`Waiting for stacks to be available, ${stackWaitI}/${max}...`);
+        stackWaitI += 1;
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
-      for (const stack of error.stacks) {
+      for (const stack of error.stacks ?? []) {
         stacks.push({
           ...errorInfo,
           line: stack.line,
