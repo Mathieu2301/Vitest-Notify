@@ -357,6 +357,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
     ]) => {
       if (!tablePropsTypes[propName]) return {
         propName: propName,
+        requiredType: requiredPropType,
         issue: 'missing',
       };
 
@@ -371,6 +372,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
     }).filter((issue) => issue !== null) as (
       {
         propName: PropertyName<RequiredProps>;
+        requiredType: PropertyType<RequiredProps>;
         issue: 'missing';
       } | {
         propName: PropertyName<RequiredProps>;
@@ -384,7 +386,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
       logger.error([
         '  Invalid schema:',
         ...issues.map((issue) => {
-          if (issue.issue === 'missing') return `    - Missing property '${issue.propName}'`;
+          if (issue.issue === 'missing') return `    - Missing property '${issue.propName}' (type: ${issue.requiredType}))`;
           return `    - Invalid type for property '${issue.propName}': expected '${issue.requiredType}', got '${issue.propType}'`;
         }),
       ].join('\n'));

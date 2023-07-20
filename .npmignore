@@ -6,3 +6,4 @@ tests/
 *.log
 .env
 tsconfig.json
+*.config.ts

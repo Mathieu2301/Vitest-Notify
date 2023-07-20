@@ -24,8 +24,13 @@ const enabled = Object.values(agents).some((agent) => agent);
 export default class CustomReporter implements Reporter {
   private outputFile: string;
 
-  onInit(ctx: Vitest): void {
+  async onInit(ctx: Vitest) {
     if (!enabled) return;
+
+    console.log('Custom reporter enabled. Using these agents:');
+    for (const [agent, available] of Object.entries(agents)) {
+      if (available) console.log(` - ${agent}`);
+    }
 
     this.outputFile = (typeof ctx.config.outputFile === 'string'
       ? ctx.config.outputFile
@@ -42,9 +47,9 @@ export default class CustomReporter implements Reporter {
       fs.rmSync(this.outputFile, { recursive: true, force: true });
     } else console.log('HTML reporter not enabled.');
 
-    console.log('Custom reporter enabled. Using these agents:');
-    for (const [agent, available] of Object.entries(agents)) {
-      if (available) console.log(` - ${agent}`);
+    if (notionAvailable) {
+      console.log('Setting up Notion database...');
+      await setupNotionDatabases();
     }
   }
 
@@ -57,9 +62,6 @@ export default class CustomReporter implements Reporter {
     let changes: Changes | undefined;
 
     if (notionAvailable) {
-      console.log('Setting up Notion database...');
-      await setupNotionDatabases();
-
       console.log('Updating Notion database...');
       changes = await updateNotionTestsDB(files);
     } else console.log('No Notion config provided. Skipping update.');
