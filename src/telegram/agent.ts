@@ -27,6 +27,26 @@ const statusEmojis: {
   UNKNOWN: '❓',
 };
 
+function sendTelegramMessage(text: string) {
+  console.log(`Sending message to Telegram (size: ${text.length})...`);
+
+  const url = new URL(`https://api.telegram.org/bot${config.key}/sendMessage`);
+  url.searchParams.set('chat_id', config.chat);
+  url.searchParams.set('parse_mode', 'markdown');
+  url.searchParams.set('text', text);
+
+  return new Promise((cb) => https.get(url, (res) => {
+    if (res.statusCode !== 200) {
+      console.error(`Cannot send message to Telegram: ${res.statusCode} (${res.statusMessage})`);
+      console.error(url);
+      console.error(text);
+      process.exit(1);
+    }
+
+    cb(true);
+  }));
+}
+
 interface TelegramReportOptions {
   stacks: Stack[];
   changes?: Changes;
@@ -45,35 +65,39 @@ export async function sendTelegramReport(
 
   const report = (stacks
     .filter((stack) => !changes || changes[stack.id])
-    .map((stack) => [
-      `${getNewEmoji(stack)}${statusEmojis.FAIL} *[FAIL]* ${pathFormat(stack.path)}`,
-      '',
-      `*${stack.error.name}*: \`${stack.error.message}\``,
-      `  ❯ \`${stack.file.name}:${stack.line}:${stack.column}\``,
-      '',
-      (stack.line
-        ? `${generateCodeSnippet({
-          filepath: stack.file.path,
-          line: stack.line,
-          column: stack.column,
-          markdownMode: true,
-        })}\n`
-        : null
-      ),
-      stack.error.diff?.replace(/\x1B\[\d+m/g, '') ?? null,
-      '',
-      (reportUrl
-        ? `Voir le détail: [report/#file=${stack.file.id}](${reportUrl}/#file=${stack.file.id})`
-        : null
-      ),
-      (notionUrls[stack.id]
-        ? `Voir l'erreur sur Notion: [notion/${notionUrls[stack.id].id}](${notionUrls[stack.id].url})`
-        : null
-      ),
-      '\n',
-    ])
-    .filter((stack) => stack !== null)
-    .flat()
+    .map((stack) => (
+      [
+        `${getNewEmoji(stack)}${statusEmojis.FAIL} *[FAIL]* ${pathFormat(stack.path)}`,
+        '',
+        `*${stack.error.name}*: \`${stack.error.message}\``,
+        `  ❯ \`${stack.file.name}:${stack.line}:${stack.column}\``,
+        '',
+        (stack.line
+          ? `${generateCodeSnippet({
+            filepath: stack.file.path,
+            line: stack.line,
+            column: stack.column,
+            markdownMode: true,
+          })}\n`
+          : null
+        ),
+
+        stack.error.diff?.replace(/\x1B\[\d+m/g, ''),
+
+        (reportUrl
+          ? `Voir le détail: [report/#file=${stack.file.id}](${reportUrl}/#file=${stack.file.id})`
+          : null
+        ),
+        (notionUrls[stack.id]
+          ? `Voir l'erreur sur Notion: [notion/${notionUrls[stack.id].id}](${notionUrls[stack.id].url})`
+          : null
+        ),
+        '',
+      ]
+      .filter((line) => line !== null)
+      .flat()
+      .join('\n')
+    ))
   );
 
   for (const change of Object.values(changes ?? {})) {
@@ -95,20 +119,26 @@ export async function sendTelegramReport(
 
   report.unshift(`======= *${config.namespace}* =======`, '');
 
-  const url = new URL(`https://api.telegram.org/bot${config.key}/sendMessage`);
-  url.searchParams.set('chat_id', config.chat as string);
-  url.searchParams.set('parse_mode', 'markdown');
-  url.searchParams.set('text', report.join('\n'));
+  // split in chunks of 4096 chars
+  const chunks = [];
 
-  return new Promise((cb) => https.get(url, (res) => {
-    if (res.statusCode !== 200) {
-      console.error(`Cannot send message to Telegram: ${res.statusCode} (${res.statusMessage})`);
-      console.error(url);
-      process.exit(1);
+  let chunk = '';
+  for (const line of report) {
+    if (line === null) continue;
+    if (line.length >= 4096) {
+      console.error('Line is too long to be sent to Telegram. Skipping...');
+      continue;
     }
+    if (chunk.length + line.length >= 4096) {
+      chunks.push(chunk);
+      chunk = '';
+    }
+    chunk += `${line}\n`;
+  }
 
-    cb(true);
-  }));
+  if (chunk.length > 0) chunks.push(chunk);
+
+  for (const chunk of chunks) await sendTelegramMessage(chunk);
 }
 
 export default available;

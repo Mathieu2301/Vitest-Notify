@@ -52,29 +52,6 @@ export interface Stack {
   };
 }
 
-function findEquivalentStack(obj: any) {
-  const isStackObject = (testObj: any) => {
-    const keys = Object.keys(testObj);
-    return ['column', 'line', 'file'].every((key) => keys.includes(key));
-  };
-
-  const seenPaths = new Set();
-
-  const recurse = (obj: any): any => {
-    if (isStackObject(obj)) return obj;
-
-    for (const v of Object.values(obj)) {
-      if (typeof v !== 'object') continue;
-      if (seenPaths.has(v)) continue;
-      seenPaths.add(v);
-      const result = recurse(v);
-      if (result) return result;
-    }
-  }
-
-  return recurse(obj);
-}
-
 let stackWaitI = 0;
 
 export async function getStacks(files: File[]): Promise<Stack[]> {
@@ -119,39 +96,32 @@ export async function getStacks(files: File[]): Promise<Stack[]> {
 
       const max = 5;
       while ((!error.stacks || !error.stacks.length) && stackWaitI <= max) {
-        if (stackWaitI >= max) {
-          console.log('No stacks available for task:\n  ', errorInfo.path.join(' > '));
-
-          console.log('  Finding equivalent stack...');
-          const equivalentStack = findEquivalentStack(task);
-
-          if (!equivalentStack) {
-            console.warn('  No equivalent stack found.');
-            stacks.push(errorInfo);
-            break;
-          }
-
-          console.log(
-            '  Equivalent stack found:',
-            `${equivalentStack.file}:${equivalentStack.line}:${equivalentStack.column}`,
-          );
-
-          stacks.push({
-            ...errorInfo,
-            line: equivalentStack.line,
-            column: equivalentStack.column,
-          });
-
-          break;
-        }
-
         console.log(`Waiting for stacks to be available, ${stackWaitI}/${max}...`);
         stackWaitI += 1;
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 400));
       }
 
-      for (const stack of error.stacks ?? []) {
+      const errorStacks = error.stacks ?? [];
+
+      if (!errorStacks.length) {
+        const stkStr = error.stack ?? error.stackStr;
+        const startIndex = stkStr.indexOf(errorInfo.file.name);
+        const endIndex = stkStr.indexOf('\n', startIndex);
+        const [line, column] = (stkStr
+          .slice(startIndex, endIndex)
+          .match(/:(\d+):(\d+)$/)?.slice(1)
+            ?? [0, 0]
+        );
+
+        errorStacks.push({
+          line: Number(line),
+          column: Number(column),
+          file: errorInfo.file.name,
+          method: '',
+        });
+      }
+
+      for (const stack of errorStacks) {
         stacks.push({
           ...errorInfo,
           line: stack.line,
