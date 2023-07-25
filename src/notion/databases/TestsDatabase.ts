@@ -13,8 +13,18 @@ export const statusIconsUrls: { [status in TestStatus]: Icon } = {
   SKIP: 'playback-pause_blue',
   TODO: 'code_pink',
   ONLY: 'checkmark_blue',
-  RUN: 'playback-play_gray',
+  RUN: 'playback-play_lightgray',
   UNKNOWN: 'question-mark_yellow',
+};
+
+export const archivedStatusIconsUrls: { [status in TestStatus]: Icon } = {
+  PASS: 'checkmark_lightgray',
+  FAIL: 'clear_lightgray',
+  SKIP: 'playback-pause_lightgray',
+  TODO: 'code_lightgray',
+  ONLY: 'checkmark_lightgray',
+  RUN: 'playback-play_lightgray',
+  UNKNOWN: 'question-mark_lightgray',
 };
 
 const requiredProps = {

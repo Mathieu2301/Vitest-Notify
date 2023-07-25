@@ -23,7 +23,7 @@ export type IconColor = (
   | 'yellow'
   | 'red'
   | 'pink'
-  | 'gray'
+  | 'lightgray'
 );
 
 export type Icon = `${IconName}_${IconColor}`;
@@ -219,6 +219,10 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
       results: data.results.map((row: {
         id: string,
         object: 'page',
+        icon: {
+          type: 'external',
+          external: { url: IconUrl },
+        },
         url: string,
       }) => ({
         ...row,

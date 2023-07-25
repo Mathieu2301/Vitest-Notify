@@ -4,6 +4,7 @@ import { generateCodeSnippet, type Stack } from '../vitest/agent';
 import { getIconUrl, type Icon } from './NotionDatabase';
 import {
   statusIconsUrls,
+  archivedStatusIconsUrls,
   type TestStatus,
   type TestPage,
   type NewTestPage,
@@ -276,6 +277,10 @@ export async function updateNotionTestsDB(files?: File[]) {
       properties: {
         archived: { checkbox: true },
       },
+      icon: (
+        archivedStatusIconsUrls[page.properties.status.status.name as TestStatus]
+        ?? archivedStatusIconsUrls.UNKNOWN
+      ),
     });
 
     stats.archived.push(page.url);
