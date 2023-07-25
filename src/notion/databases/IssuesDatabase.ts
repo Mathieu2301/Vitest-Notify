@@ -10,7 +10,7 @@ const requiredProps = {
   name: { name: { EN: 'Message', FR: 'Message' }, type: 'title' },
   test: { name: { EN: 'Associated test', FR: 'Test associé' }, type: 'relation' },
   assigned: { name: { EN: 'Assigned', FR: 'Assigné' }, type: 'people' },
-  priority: { name: { EN: 'Priority', FR: 'Priorité' }, type: 'select' },
+  importance: { name: { EN: 'Importance', FR: 'Importance' }, type: 'select' },
   status: { name: { EN: 'Test status', FR: 'État du test' }, type: 'rollup', optional: true },
 } as const;
 

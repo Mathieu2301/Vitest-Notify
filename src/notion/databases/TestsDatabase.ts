@@ -23,7 +23,7 @@ const requiredProps = {
   tag: { name: { EN: 'Tag', FR: 'Tag' }, type: 'select' },
   fileName: { name: { EN: 'File', FR: 'Fichier' }, type: 'select' },
   assigned: { name: { EN: 'Assigned', FR: 'Assigné' }, type: 'people' },
-  priority: { name: { EN: 'Priority', FR: 'Priorité' }, type: 'select' },
+  importance: { name: { EN: 'Importance', FR: 'Importance' }, type: 'select' },
   status: { name: { EN: 'Status', FR: 'État' }, type: 'status' },
   archived: { name: { EN: 'Archived', FR: 'Archivé' }, type: 'checkbox' },
   active: { name: { EN: 'Active', FR: 'Actif' }, type: 'checkbox' },

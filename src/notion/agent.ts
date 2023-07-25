@@ -64,7 +64,7 @@ export interface Change {
   status: TestStatus;
   pageUrl: string;
   pageId: string;
-  priority: string;
+  importance: string;
   assigned: { id: string }[];
   active: boolean;
   isNewTest: boolean;
@@ -220,7 +220,7 @@ export async function updateNotionTestsDB(files?: File[]) {
       status: test.status,
       pageId: testOldPage.id,
       pageUrl: testOldPage.url,
-      priority: testOldPage.properties.priority.select?.name ?? null,
+      importance: testOldPage.properties.importance.select?.name ?? null,
       assigned: testOldPage.properties.assigned.people.map(({ id }) => ({ id })),
       active: testOldPage.properties.active.checkbox || newActive,
       isNewTest,
@@ -328,8 +328,8 @@ export async function updateNotionIssuesDB(stacks: Stack[], changes: Changes, re
         test: { relation: [{
           id: changes[stack.id].pageId,
         }] },
-        priority: (changes[stack.id].priority
-          ? { select: { name: changes[stack.id].priority } }
+        importance: (changes[stack.id].importance
+          ? { select: { name: changes[stack.id].importance } }
           : undefined
         ),
         assigned: { people: changes[stack.id].assigned },
