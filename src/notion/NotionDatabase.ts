@@ -209,26 +209,37 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
       return translated;
     };
 
-    const data = await this.controller.client.databases.query({
-      database_id: this.id,
-      filter: filter ? translateFilter(filter) : undefined,
-    });
+    const translatedFilter = filter ? translateFilter(filter) : undefined;
 
-    return {
-      ...data,
-      results: data.results.map((row: {
-        id: string,
-        object: 'page',
-        icon: {
-          type: 'external',
-          external: { url: IconUrl },
-        },
-        url: string,
-      }) => ({
-        ...row,
-        properties: this.propsNamesToIds((row as any).properties) as PropsById<RequiredProps>,
-      })),
+    type RawRows = Awaited<ReturnType<typeof this.controller.client.databases.query>>['results'];
+    const rawRows: RawRows = [];
+    let has_more = true;
+    let start_cursor;
+
+    while (has_more) {
+      const data = await this.controller.client.databases.query({
+        database_id: this.id,
+        filter: translatedFilter,
+        start_cursor,
+      });
+
+      rawRows.push(...data.results);
+      has_more = data.has_more;
+      start_cursor = data.next_cursor;
     }
+
+    return rawRows.map((row: {
+      id: string,
+      object: 'page',
+      icon: {
+        type: 'external',
+        external: { url: IconUrl },
+      },
+      url: string,
+    }) => ({
+      ...row,
+      properties: this.propsNamesToIds((row as any).properties) as PropsById<RequiredProps>,
+    }));
   }
 
   public async createRow(
@@ -277,7 +288,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
 
   private propsIdsToNames(props: Partial<PropsById<RequiredProps>>) {
     return Object.fromEntries(
-      Object.entries(props).map(([propId, value] : [
+      Object.entries(props).map(([propId, value]: [
         PropertyId<RequiredProps>,
         NotionPropertiesTypes[PropertyType<RequiredProps>],
       ]) => {
@@ -289,7 +300,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
 
   public propsNamesToIds(props: Partial<PropsByName<RequiredProps>>) {
     return Object.fromEntries(
-      Object.entries(props).map(([propName, value] : [
+      Object.entries(props).map(([propName, value]: [
         PropertyName<RequiredProps>,
         NotionPropertiesTypes[PropertyType<RequiredProps>],
       ]) => {

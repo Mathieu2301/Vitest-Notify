@@ -151,10 +151,12 @@ export async function updateNotionTestsDB(files?: File[]) {
 
   // Update database
 
-  const { results: testPages } = await notion.tests.getRows({
+  const testPages = await notion.tests.getRows({
     property: 'project',
     select: { equals: config.namespace },
   });
+
+  console.log(`Updating ${testPages.length} pages...`);
 
   const updated = new Set<string>();
   const changes: Changes = {};
@@ -410,7 +412,7 @@ export async function updateNotionDatabases() {
   // Update databases titles and icons
   {
     console.log('Getting \'tests\' database...');
-    const { results: testPages } = await notion.tests.getRows({
+    const testPages = await notion.tests.getRows({
       and: [
         { property: 'archived', checkbox: { equals: false } },
         { property: 'active', checkbox: { equals: true } },
