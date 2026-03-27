@@ -145,6 +145,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
   protected readonly controller: Controller;
   readonly id: string;
   readonly fields: RequiredProps;
+  private _dataSourceId: string | undefined;
 
   constructor({ controller, id }: NotionDatabaseConfig, fields: RequiredProps) {
     this.controller = controller;
@@ -152,34 +153,51 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
     this.fields = fields;
   }
 
-  protected async prepareDatabase(header: any) {
+  protected async prepareDataSource(dataSource: any) {
     return;
+  }
+
+  private async getDataSourceId(): Promise<string> {
+    if (this._dataSourceId) return this._dataSourceId;
+
+    const db = await this.controller.client.databases.retrieve({
+      database_id: this.id,
+    });
+
+    if (!('data_sources' in db) || !db.data_sources.length) {
+      throw new Error(`No data sources found for database '${this.id}'`);
+    }
+
+    this._dataSourceId = db.data_sources[0].id;
+    return this._dataSourceId;
   }
 
   public async setup() {
     logger.log(`Setting up '${this.name}' database...`);
 
-    const header = await this.controller.client.databases.retrieve({
-      database_id: this.id,
+    const dataSourceId = await this.getDataSourceId();
+    const dataSource = await this.controller.client.dataSources.retrieve({
+      data_source_id: dataSourceId,
     }) as any;
 
     if (!this.controller.lang) {
       logger.log('  Getting databases language...');
-      this.controller.lang = this.getTableLang(header);
+      this.controller.lang = this.getTableLang(dataSource);
       logger.log(`  Detected language: ${this.controller.lang}`);
     }
 
-    await this.prepareDatabase(header);
+    await this.prepareDataSource(dataSource);
 
     logger.log('  Checking database schema...');
-    const result = this.checkTableSchema(header);
+    const result = this.checkTableSchema(dataSource);
     logger.separator();
     return result;
   }
 
   public async getHeader(): Promise<HeaderObject<RequiredProps> & MetaData> {
-    const data = await this.controller.client.databases.retrieve({
-      database_id: this.id,
+    const dataSourceId = await this.getDataSourceId();
+    const data = await this.controller.client.dataSources.retrieve({
+      data_source_id: dataSourceId,
     }) as any;
 
     return {
@@ -188,21 +206,28 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
     };
   }
 
-  public editHeader(
+  public async editHeader(
     { title, properties, icon }: Partial<HeaderObject<RequiredProps>>,
   ) {
-    return this.controller.client.databases.update({
-      database_id: this.id,
-      title,
-      properties: (properties
-        ? this.propsIdsToNames(properties as any) as any
-        : undefined
-      ),
-      icon: (icon
-        ? getIconObject(icon) as any
-        : undefined
-      ),
-    });
+    const iconObject = icon ? getIconObject(icon) as any : undefined;
+
+    // Title and icon are updated at the database level
+    if (title || icon) {
+      await this.controller.client.databases.update({
+        database_id: this.id,
+        title,
+        icon: iconObject,
+      });
+    }
+
+    // Properties are updated at the data source level
+    if (properties) {
+      const dataSourceId = await this.getDataSourceId();
+      await this.controller.client.dataSources.update({
+        data_source_id: dataSourceId,
+        properties: this.propsIdsToNames(properties as any) as any,
+      });
+    }
   }
 
   public async getRows(filter?: FilterObject<RequiredProps>) {
@@ -216,14 +241,16 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
 
     const translatedFilter = filter ? translateFilter(filter) : undefined;
 
-    type RawRows = Awaited<ReturnType<typeof this.controller.client.databases.query>>['results'];
+    const dataSourceId = await this.getDataSourceId();
+
+    type RawRows = Awaited<ReturnType<typeof this.controller.client.dataSources.query>>['results'];
     const rawRows: RawRows = [];
     let has_more = true;
-    let start_cursor;
+    let start_cursor: string | undefined;
 
     while (has_more) {
-      const data = await this.controller.client.databases.query({
-        database_id: this.id,
+      const data = await this.controller.client.dataSources.query({
+        data_source_id: dataSourceId,
         filter: translatedFilter,
         start_cursor,
       });
@@ -247,8 +274,9 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
   public async createRow(
     { properties, content, icon }: NewPageObject<RequiredProps>,
   ): Promise<PageObject<RequiredProps>> {
+    const dataSourceId = await this.getDataSourceId();
     const response = await this.controller.client.pages.create({
-      parent: { database_id: this.id },
+      parent: { data_source_id: dataSourceId },
       properties: (properties
         ? this.propsIdsToNames(properties) as any
         : undefined
