@@ -4,6 +4,10 @@ on:
   release:
     types: [created]
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish-npm:
     runs-on: ubuntu-latest
@@ -17,5 +21,3 @@ jobs:
       - run: yarn build
       - run: npm version ${{ github.event.release.tag_name }} --no-git-tag-version --allow-same-version
       - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
