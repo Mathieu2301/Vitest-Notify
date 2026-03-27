@@ -27,9 +27,14 @@ export type IconColor = (
 );
 
 export type Icon = `${IconName}_${IconColor}`;
-export type IconUrl = `https://www.notion.so/icons/${Icon}.svg`;
+export type IconObject = { type: 'icon'; icon: { name: IconName; color: IconColor } };
 
-export const getIconUrl = (icon: Icon): IconUrl => `https://www.notion.so/icons/${icon}.svg`;
+export const getIconObject = (icon: Icon): IconObject => {
+  const lastUnderscore = icon.lastIndexOf('_');
+  const name = icon.slice(0, lastUnderscore) as IconName;
+  const color = icon.slice(lastUnderscore + 1) as IconColor;
+  return { type: 'icon', icon: { name, color } };
+};
 
 export interface NotionDatabaseConfig {
   controller: Controller;
@@ -194,7 +199,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
         : undefined
       ),
       icon: (icon
-        ? { type: 'external', external: { url: getIconUrl(icon) } }
+        ? getIconObject(icon) as any
         : undefined
       ),
     });
@@ -231,10 +236,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
     return rawRows.map((row: {
       id: string,
       object: 'page',
-      icon: {
-        type: 'external',
-        external: { url: IconUrl },
-      },
+      icon: IconObject,
       url: string,
     }) => ({
       ...row,
@@ -253,7 +255,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
       ),
       children: content,
       icon: (icon
-        ? { type: 'external', external: { url: getIconUrl(icon) } }
+        ? getIconObject(icon) as any
         : undefined
       ),
     }) as any;
@@ -274,7 +276,7 @@ export default class NotionDatabase<RequiredProps extends RequiredProperties> {
         : undefined
       ),
       icon: (icon
-        ? { type: 'external', external: { url: getIconUrl(icon) } }
+        ? getIconObject(icon) as any
         : undefined
       ),
     });

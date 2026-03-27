@@ -1,7 +1,7 @@
 import Notion from './DatabaseController';
 import env from '../config';
 import { generateCodeSnippet, type Stack } from '../vitest/agent';
-import { getIconUrl, type Icon } from './NotionDatabase';
+import { getIconObject, type Icon } from './NotionDatabase';
 import {
   statusIconsUrls,
   archivedStatusIconsUrls,
@@ -87,7 +87,10 @@ const needUpdate = (base: any, reference: any) => {
       if (needUpdate(base[key], val)) return true;
       continue;
     }
-    if (base[key] !== val) return true;
+    if (base[key] !== val) {
+      console.log(`NEED UPDATE → ${key} ('${base[key]}' !== '${val}')`);
+      return true;
+    }
   }
 
   return false;
@@ -236,10 +239,7 @@ export async function updateNotionTestsDB(files?: File[]) {
 
       if (!needUpdate(page, {
         properties: params.properties,
-        icon: {
-          type: 'external',
-          external: { url: getIconUrl(params.icon) },
-        },
+        icon: getIconObject(params.icon),
       })) {
         stats.kept += 1;
         continue;
