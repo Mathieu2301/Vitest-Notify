@@ -19,20 +19,7 @@ export default class DatabaseController {
   public readonly issues: IssuesDatabase;
 
   constructor({ auth, dbIDs }: DatabaseControllerConfig) {
-    this.client = new Client({
-      auth,
-      async fetch(url: string, init?: RequestInit) {
-        try {
-          const res = await fetch(url, init);
-          if (!res.ok) throw new Error();
-          return res;
-        } catch {
-          console.warn(`\nNotion API error (${url}), retrying...\n`);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          return fetch(url, init);
-        }
-      }
-    });
+    this.client = new Client({ auth });
 
     this.tests = new TestsDatabase({
       controller: this,

@@ -23,9 +23,9 @@ export default class IssuesDatabase extends NotionDatabase<RequiredProps> {
     super(config, requiredProps);
   }
 
-  protected async prepareDatabase(header: any) {
+  protected async prepareDataSource(dataSource: any) {
     const propertyName = this.fields.test.name[this.controller.lang];
-    const testProperty = header.properties[propertyName];
+    const testProperty = dataSource.properties[propertyName];
 
     if (
       testProperty
@@ -34,8 +34,8 @@ export default class IssuesDatabase extends NotionDatabase<RequiredProps> {
     ) return;
 
     logger.info(`Setting '${propertyName}' property as a relation...`);
-    await this.controller.client.databases.update({
-      database_id: this.id,
+    await this.controller.client.dataSources.update({
+      data_source_id: dataSource.id,
       properties: {
         [propertyName]: {
           relation: {
@@ -44,7 +44,7 @@ export default class IssuesDatabase extends NotionDatabase<RequiredProps> {
             single_property: {},
           },
         },
-      },
+      } as any,
     });
   }
 }
