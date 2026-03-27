@@ -9,7 +9,7 @@ import {
   type TestPage,
   type NewTestPage,
 } from './databases/TestsDatabase';
-import type { File, Task } from 'vitest';
+import type { File, Task } from '@vitest/runner';
 
 const config = {
   namespace: env('VITEST_NAMESPACE'),

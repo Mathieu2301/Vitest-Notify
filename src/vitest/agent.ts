@@ -1,5 +1,5 @@
 import fs from 'fs';
-import type { File, Task } from 'vitest';
+import type { File, Task } from '@vitest/runner';
 
 export function generateCodeSnippet({
   filepath,
@@ -104,7 +104,7 @@ export async function getStacks(files: File[]): Promise<Stack[]> {
       const errorStacks = error.stacks ?? [];
 
       if (!errorStacks.length) {
-        const stkStr = error.stack ?? error.stackStr;
+        const stkStr = String(error.stack ?? error.stackStr ?? '');
         const startIndex = stkStr.indexOf(errorInfo.file.name);
         const endIndex = stkStr.indexOf('\n', startIndex);
         const [line, column] = (stkStr
