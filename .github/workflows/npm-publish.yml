@@ -20,4 +20,4 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: yarn build
       - run: npm version ${{ github.event.release.tag_name }} --no-git-tag-version --allow-same-version
-      - run: npm publish
+      - run: npm publish --provenance --access public
