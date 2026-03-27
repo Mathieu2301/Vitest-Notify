@@ -22,5 +22,3 @@ jobs:
       - run: yarn build
       - run: npm version ${{ github.event.release.tag_name }} --no-git-tag-version --allow-same-version
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ""
