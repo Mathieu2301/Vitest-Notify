@@ -1,0 +1,6 @@
+{
+    "scripts": {
+        "setup": "yarn & ln -s \"$CONDUCTOR_ROOT_PATH/.env\" .env",
+        "run": "yarn build && yarn test"
+    }
+}
