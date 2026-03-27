@@ -15,12 +15,13 @@
     "dotenv": "^16.3.1",
     "surge-fstream-ignore": "^1.0.6",
     "tarr": "^1.1.0",
-    "vitest": "^0.32.2"
+    "vitest": "^4.1.2"
   },
   "devDependencies": {
-    "@vitest/ui": "^0.32.2",
+    "@types/node": "^25.5.0",
+    "@vitest/ui": "^4.1.2",
     "nodemon": "^2.0.22",
     "ts-node": "^10.9.1",
-    "typescript": "^5.1.6"
+    "typescript": "~5.8"
   }
 }

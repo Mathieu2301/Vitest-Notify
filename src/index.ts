@@ -11,7 +11,9 @@ import notionAvailable, {
   type Changes,
   type PagesUrls,
 } from './notion/agent';
-import type { Vitest, Reporter, File } from 'vitest';
+import type { Vitest } from 'vitest/node';
+import type { Reporter } from 'vitest/reporters';
+import type { File } from '@vitest/runner';
 
 const agents = {
   telegram: telegramAvailable,
@@ -23,8 +25,12 @@ const enabled = Object.values(agents).some((agent) => agent);
 
 export default class CustomReporter implements Reporter {
   private outputFile: string;
+  private vitest: Vitest;
+  private notionSetup: Promise<void> | undefined;
 
-  async onInit(ctx: Vitest) {
+  onInit(ctx: Vitest) {
+    this.vitest = ctx;
+
     if (!enabled) return;
 
     console.log('Custom reporter enabled. Using these agents:');
@@ -38,7 +44,13 @@ export default class CustomReporter implements Reporter {
     ) ?? 'html/index.html';
 
     if (surgeAvailable) {
-      if (!(ctx.config.reporters as string[]).includes('html')) {
+      const reporterNames = (ctx.config.reporters ?? []).map((r) => {
+        if (typeof r === 'string') return r;
+        if (Array.isArray(r)) return r[0];
+        return '';
+      });
+
+      if (!reporterNames.includes('html')) {
         console.error('Surge requires HTML reporter to be enabled.');
         process.exit(1);
       }
@@ -49,15 +61,19 @@ export default class CustomReporter implements Reporter {
 
     if (notionAvailable) {
       console.log('Setting up Notion database...');
-      await setupNotionDatabases();
+      this.notionSetup = setupNotionDatabases();
     }
   }
 
-  async onFinished(files?: File[], errors?: unknown[]): Promise<void> {
+  async onTestRunEnd(): Promise<void> {
     if (!enabled) {
       console.log('No VitestNotify agent configured. Skipping...');
       return;
     }
+
+    await this.notionSetup;
+
+    const files = this.vitest.state.getFiles();
 
     let changes: Changes | undefined;
 
